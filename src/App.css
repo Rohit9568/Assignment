@@ -1,0 +1,193 @@
+/* SQL Editor Styles */
+.App {
+  text-align: center;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.content-area {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.query-area {
+  flex: 1;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-container {
+  margin-bottom: 1rem;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.table-container {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: 1rem;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  background-color: #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+/* Custom tabs styling */
+.custom-tab-container {
+  width: 100%;
+}
+
+.custom-tabs .nav-tabs {
+  border-bottom: 1px solid #dee2e6;
+}
+
+.custom-tabs .nav-link,
+.nav-tabs .nav-link {
+  color: #495057;
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-top-left-radius: 0.25rem;
+  border-top-right-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.custom-tabs .nav-link:hover,
+.nav-tabs .nav-link:hover {
+  border-color: #e9ecef #e9ecef #dee2e6;
+  background-color: #f8f9fa;
+}
+
+.custom-tabs .nav-link.active,
+.nav-tabs .nav-link.active {
+  color: #495057;
+  background-color: #fff;
+  border-color: #dee2e6 #dee2e6 #fff;
+}
+
+/* SQL code editor styles */
+.cm-editor {
+  height: 200px !important;
+  border-radius: 4px;
+  font-family: 'Fira Code', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.cm-gutters {
+  background-color: #f8f9fa !important;
+  border-right: 1px solid #dee2e6 !important;
+  color: #6c757d !important;
+}
+
+/* Override root container styles from Vite */
+#root {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+  height: 100vh;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .editor-container {
+      height: 150px;
+  }
+
+  .cm-editor {
+      height: 150px !important;
+  }
+}
+
+/* Button styling */
+.btn-primary {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+}
+
+.btn-outline-light:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.query-editor.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #fff;
+  z-index: 9999;
+  padding: 16px;
+  overflow: auto;
+}
+
+.code-editor-container {
+  transition: height 0.3s ease;
+}
+
+.theme-dark {
+  background-color: #1e1e1e;
+  color: #fff;
+}
+
+.theme-light {
+  background-color: #f8f9fa;
+  color: #212529;
+}
+
+/* New fullscreen styles */
+.app-fullscreen {
+  overflow: hidden; /* Prevent scrollbars in true fullscreen */
+}
+
+.fullscreen-container {
+  padding: 0 !important; /* Remove container padding in true fullscreen */
+}
+
+.fullscreen-content {
+  padding: 0 !important; /* Remove content padding in true fullscreen */
+}
+
+.query-editor.fullscreen .code-editor-container .react-codemirror {
+  height: 100% !important; /* Make CodeMirror take full height in component fullscreen */
+}
+
+.query-editor.fullscreen .code-editor-container .cm-editor {
+  height: 100% !important;
+}
+
+.tab-container {
+  height: 100%; /* Ensure tab container takes full height */
+  display: flex;
+  flex-direction: column;
+}
+
+.query-container {
+  flex-grow: 1; /* Allow query container to grow */
+  display: flex;
+  flex-direction: column;
+}
+
+.query-editor-row {
+  flex-grow: 1; /* Allow editor row to grow */
+}
+
+.results-row {
+  /* Adjust as needed based on your desired layout between editor and results */
+}
+
+/* Sidebar fixed width and disable resize */
+.sidebar-fixed {
+  resize: none !important;
+  overflow-y: auto;
+}

@@ -1,0 +1,49 @@
+/* BaseTable.css */
+
+
+.results-table > thead > tr.results-table-header-row {
+    background-color: #007bff !important; /* Blue header background */
+    color: #ffffff !important; /* White header text */
+}
+
+.results-table > thead > tr > th.results-table-header-cell {
+    border-right: 1px solid white !important; /* White lines between header columns */
+    padding: 0.75rem !important;
+    position: relative !important; /* For resize handle positioning */
+    user-select: none !important; /* Prevent text selection during drag */
+}
+
+.results-table > thead > tr > th.results-table-header-cell:last-child {
+    border-right: none !important; /* Remove border on the last header cell */
+}
+
+.results-table > tbody > tr > td.results-table-cell {
+    border-right: 1px solid #dee2e6 !important; /* Light grey lines between data columns */
+    padding: 0.75rem !important;
+}
+
+.results-table > tbody > tr > td.results-table-cell:last-child {
+    border-right: none !important; /* Remove border on the last data cell */
+}
+
+/* Column Resizing Styles */
+.resizer {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 5px;
+    background: rgba(255, 255, 255, 0.3) !important; /* Light background for visibility */
+    cursor: col-resize !important;
+    user-select: none !important;
+    opacity: 0; /* Initially hidden */
+    transition: opacity 0.2s ease-in-out !important; /* Smooth transition for hover effect */
+}
+
+.results-table > thead > tr > th.results-table-header-cell:hover .resizer {
+    opacity: 1 !important; /* Show resizer on header hover */
+}
+
+.resizer.isResizing {
+    background: rgba(255, 255, 255, 0.7) !important; /* More visible during resize */
+}

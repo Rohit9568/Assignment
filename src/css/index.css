@@ -1,0 +1,76 @@
+body {
+  font-family: 'Raleway', sans-serif !important;
+}
+
+.CodeMirror {
+  height: 80%;
+  border-radius: 0.25em;
+}
+
+.sidebar {
+  background-color: #f8f9fa;
+  border-right: 1px solid #ececec;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.2s ease;
+}
+
+.sidebar.resizing {
+  transition: none;
+}
+
+.drag-handle {
+  width: 6px;
+  background-color: #ccc;
+  cursor: ew-resize;
+}
+
+.drag-handle:hover {
+  background-color: #999;
+}
+
+.sidebar .nav-link {
+  text-decoration: none;
+  color: var(--bs-secondary);
+  padding-left: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar .nav-link:hover,
+.sidebar .active {
+  color: var(--bs-primary);
+}
+
+.heading {
+  font-weight: bold;
+  color: #282c34;
+}
+
+.tableLinks,
+.tabLinks {
+  border-left: 1px solid var(--bs-secondary);
+}
+
+.query-editor.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000; /* Ensure it's above other elements */
+  background-color: white; /* Optional: Add a background color */
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.query-editor.fullscreen .code-editor-container {
+  flex-grow: 1;
+}
+
+.query-editor.fullscreen .editor-actions {
+  margin-bottom: 1rem;
+}
