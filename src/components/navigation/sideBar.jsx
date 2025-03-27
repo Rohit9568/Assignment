@@ -1,5 +1,5 @@
 // src/components/navigation/sideBar.jsx
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import CloseButton from "react-bootstrap/CloseButton";
 import Col from "react-bootstrap/Col";
 import Container from "react-bootstrap/Container";
@@ -19,7 +19,7 @@ function SideBar(props) {
         setActiveKey = () => {},
         mobile = false,
         onTableClick, // Add the onTableClick prop
-        queryHistory, // Receive queryHistory
+        queryHistory: initialQueryHistory = [], // Receive initial queryHistory
         onHistoryItemClick // Receive onHistoryItemClick
     } = props;
 
@@ -27,6 +27,16 @@ function SideBar(props) {
     const [sidebarWidth, setSidebarWidth] = useState(250);
     const sidebarRef = useRef(null);
     const isResizing = useRef(false);
+
+    // State for local recent queries
+    const [localRecentQueries, setLocalRecentQueries] = useState(() => {
+        return initialQueryHistory;
+    });
+
+    // Update localRecentQueries when initialQueryHistory prop changes
+    useEffect(() => {
+        setLocalRecentQueries(initialQueryHistory);
+    }, [initialQueryHistory]);
 
     // Drag to resize
     const handleMouseDown = (e) => {
@@ -54,6 +64,34 @@ function SideBar(props) {
         document.addEventListener('mouseup', onMouseUp);
     };
 
+    const handleTableClick = (fileName) => {
+        const defaultQuery = `SELECT * FROM \`${fileName}\`;`; // Removed LIMIT 10
+        openNewTab(
+            {
+                title: fileName, // Set the tab title to the table name
+                content: defaultQuery, // Set the initial query content
+                entries: [],
+            },
+            tabs,
+            setTabs,
+            setActiveKey,
+            fileName // Pass the table name as eventKey for easier identification
+        );
+        if (onTableClick) {
+            onTableClick(fileName); // Call the function passed from App
+        }
+
+        // Update recent queries, but only if it's not already present
+        if (!localRecentQueries.some(item => item.title === fileName)) {
+            setLocalRecentQueries([{ id: Date.now(), title: fileName, query: defaultQuery }, ...localRecentQueries]);
+        }
+    };
+
+    const handleHistoryItemClickLocal = (item) => {
+        onHistoryItemClick(item);
+        // No need to add to recent queries again if clicking on a history item
+    };
+
     const menuLinks = (FILE_NAMES || []).map((fileName) => (
         <Row className="nav-item" key={fileName}>
             <Col>
@@ -62,21 +100,7 @@ function SideBar(props) {
                     className={fileName === activeKey ? "nav-link active" : "nav-link"}
                     onClick={(e) => {
                         e.preventDefault();
-                        const defaultQuery = `SELECT * FROM \`${fileName}\`;`; // Removed LIMIT 10
-                        openNewTab(
-                            {
-                                title: fileName, // Set the tab title to the table name
-                                content: defaultQuery, // Set the initial query content
-                                entries: [],
-                            },
-                            tabs,
-                            setTabs,
-                            setActiveKey,
-                            fileName // Pass the table name as eventKey for easier identification
-                        );
-                        if (onTableClick) {
-                            onTableClick(fileName); // Call the function passed from App
-                        }
+                        handleTableClick(fileName);
                     }}
                 >
                     <FontAwesomeIcon icon={fileName === activeKey ? faChevronDown : faChevronRight} />{" "}
@@ -86,36 +110,7 @@ function SideBar(props) {
         </Row>
     ));
 
-    // const openTabs = (tabs || []).map((tab) => (
-    //     <Row className="nav-item align-items-center" key={tab.eventKey || Math.random().toString()}>
-    //         <Col xs={10}>
-    //             <a
-    //                 href={`/${tab.title}`}
-    //                 className={tab.eventKey === activeKey ? "nav-link active" : "nav-link"}
-    //                 onClick={(e) => {
-    //                     e.preventDefault();
-    //                     setActiveKey(tab.eventKey);
-    //                 }}
-    //             >
-    //                 <FontAwesomeIcon icon={tab.eventKey === activeKey ? faChevronDown : faChevronRight} />{" "}
-    //                 <FontAwesomeIcon icon={faTable} /> {tab.title || 'Untitled'}{" "}
-    //             </a>
-    //         </Col>
-    //         <Col xs={2}>
-    //             <CloseButton
-    //                 style={{ fontSize: "0.5rem" }}
-    //                 onClick={(e) => {
-    //                     e.stopPropagation();
-    //                     const [newTabs, newActiveKey] = closeTab(tab.eventKey, tabs);
-    //                     setTabs(newTabs);
-    //                     setActiveKey(newActiveKey);
-    //                 }}
-    //             />
-    //         </Col>
-    //     </Row>
-    // ));
-
-    const historyItems = (queryHistory || []).map(item => (
+    const historyItems = (localRecentQueries || []).map(item => (
         <Row className="nav-item" key={item.id}>
             <Col>
                 <a
@@ -123,10 +118,10 @@ function SideBar(props) {
                     className="nav-link"
                     onClick={(e) => {
                         e.preventDefault();
-                        onHistoryItemClick(item);
+                        handleHistoryItemClickLocal(item);
                     }}
                 >
-                    <FontAwesomeIcon icon={faHistory} /> {item.title || item.query.substring(0, 20) + "..."}
+                    <FontAwesomeIcon icon={faHistory} /> {item.title || item.query?.substring(0, 20) + "..."}
                 </a>
             </Col>
         </Row>
@@ -166,4 +161,4 @@ function SideBar(props) {
 
 SideBar.propTypes = getPropTypes("activeKey", "tabs", "setTabs", "setActiveKey", "mobile", "onTableClick", "queryHistory", "onHistoryItemClick"); // Add propTypes
 
-export default SideBar; 
+export default SideBar;
