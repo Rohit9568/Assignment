@@ -21,7 +21,7 @@ export default defineConfig({
     extensions: ['.js', '.jsx', '.json'],
   },
   build: {
-    outDir: 'build',
+    outDir: 'dist',
     sourcemap: true,
     minify: 'terser',
     rollupOptions: {
