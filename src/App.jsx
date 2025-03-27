@@ -90,7 +90,13 @@ function App() {
 
     const addToQueryHistory = (query, title) => {
         const newHistoryItem = { id: Date.now(), query, title, timestamp: new Date() };
-        setQueryHistory(prevHistory => [newHistoryItem, ...prevHistory].slice(0, 15));
+        setQueryHistory(prevHistory => {
+            // Check if an item with the same title already exists
+            if (prevHistory.some(item => item.title === title)) {
+                return prevHistory; // Don't add if it already exists
+            }
+            return [newHistoryItem, ...prevHistory].slice(0, 15);
+        });
     };
 
     const handleAddFirstTab = () => {
@@ -136,6 +142,7 @@ function App() {
             setActiveKey(newTab.eventKey);
             setSidebarOpen(true);
         }
+        // Importantly, do NOT call addToQueryHistory here
     };
 
     return (
