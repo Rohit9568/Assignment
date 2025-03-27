@@ -1,9 +1,12 @@
 // table/BaseTable.jsx
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   useTable,
   useSortBy,
   useGlobalFilter,
   usePagination,
+  useResizeColumns,
+  useFlexLayout
 } from "react-table";
 
 import Container from "react-bootstrap/Container";
@@ -15,329 +18,481 @@ import Spinner from "react-bootstrap/Spinner";
 import FloatingLabel from "react-bootstrap/FloatingLabel";
 import Pagination from "react-bootstrap/Pagination";
 import Alert from "react-bootstrap/Alert";
+import Button from "react-bootstrap/Button";
+import Modal from "react-bootstrap/Modal";
+import Badge from "react-bootstrap/Badge";
+import InputGroup from "react-bootstrap/InputGroup";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck } from "@fortawesome/free-solid-svg-icons/faCheck";
+import {
+  faCheck,
+  faSort,
+  faSortUp,
+  faSortDown,
+  faEye,
+  faSearch,
+  faTimes
+} from "@fortawesome/free-solid-svg-icons";
 
 import { getPropTypes } from "../../utils";
 import './BaseTable.css';
-import React from 'react'; // Ensure React is imported
 
-function BaseTable(props) {
-  const defaultColumn = React.useMemo(
-      () => ({
-          minWidth: 30,
-          width: 150,
-      }),
-      []
-  );
-
-  const {
-      getTableProps,
-      getTableBodyProps,
-      headerGroups,
-      page,
-      rows,
-      prepareRow,
-      canPreviousPage,
-      canNextPage,
-      pageCount,
-      gotoPage,
-      nextPage,
-      previousPage,
-      setGlobalFilter,
-      setPageSize,
-      state: { pageIndex, pageSize },
-      allColumns,
-      setColumnWidth,
-  } = useTable(
-      {
-          columns: props.columns,
-          data: props.data,
-          defaultColumn,
-      },
-      useGlobalFilter,
-      useSortBy,
-      usePagination
-  );
-
-  const firstRender = React.useRef(true);
-
-  React.useEffect(() => {
-      if (firstRender.current) {
-          firstRender.current = false;
-          return;
-      }
-
-      const attachResizers = () => {
-          const headers = document.querySelectorAll('.results-table th');
-          headers.forEach(header => {
-              if (!header.querySelector('.resizer')) {
-                  const resizer = document.createElement('div');
-                  resizer.className = 'resizer';
-                  header.style.position = 'relative';
-                  header.appendChild(resizer);
-              }
-          });
-      };
-
-      attachResizers();
-
-      const handleResize = (e) => {
-          if (!e.target.classList.contains('resizer')) return;
-          let startX = e.clientX;
-          const header = e.target.parentNode;
-          const index = header.cellIndex;
-          const column = allColumns[index];
-          const startWidth = header.offsetWidth;
-
-          const mouseMoveHandler = (moveEvent) => {
-              const newWidth = startWidth + (moveEvent.clientX - startX);
-              setColumnWidth(column.id, newWidth);
-          };
-
-          const mouseUpHandler = () => {
-              document.removeEventListener('mousemove', mouseMoveHandler);
-              document.removeEventListener('mouseup', mouseUpHandler);
-          };
-
-          document.addEventListener('mousemove', mouseMoveHandler);
-          document.addEventListener('mouseup', mouseUpHandler);
-      };
-
-      const table = document.querySelector('.results-table');
-      if (table) {
-          table.addEventListener('mousedown', handleResize);
-          return () => table.removeEventListener('mousedown', handleResize);
-      }
-  }, [headerGroups, allColumns, setColumnWidth]);
-
-  const exportToCSV = () => {
-      if (!props.data || props.data.length === 0) {
-          alert("No data to export.");
-          return;
-      }
-
-      const headers = props.columns.map(col => col.Header).join(',');
-      const csvRows = props.data.map(row =>
-          props.columns.map(col => {
-              const accessor = typeof col.accessor === 'function' ? col.accessor : (obj) => obj[col.accessor];
-              let value = accessor(row);
-              if (value === null || value === undefined) {
-                  value = '';
-              } else if (typeof value === 'string') {
-                  value = `"${value.replace(/"/g, '""')}"`; // Escape double quotes
-              }
-              return value;
-          }).join(',')
-      );
-
-      const csvData = [headers, ...csvRows].join('\n');
-      const filename = 'exported_data.csv';
-      downloadFile(csvData, filename, 'text/csv;charset=utf-8;');
+// Separate search component that doesn't lose focus
+function TableSearch({ onSearch }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  const handleChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    onSearch(value);
   };
-
-  const exportToJSON = () => {
-      if (!props.data || props.data.length === 0) {
-          alert("No data to export.");
-          return;
-      }
-
-      const jsonData = JSON.stringify(props.data, null, 2); // null, 2 for pretty printing
-      const filename = 'exported_data.json';
-      downloadFile(jsonData, filename, 'application/json');
+  
+  const clearSearch = () => {
+    setSearchTerm("");
+    onSearch("");
   };
-
-  const downloadFile = (data, filename, type) => {
-      const blob = new Blob([data], { type });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-  };
-
-  if (!props.isLoaded) {
-      return (
-          <Container className="h-100">
-              <Row className="justify-content-center">
-                  <Spinner animation="border" role="status" as="span" />
-                  Loading...
-              </Row>
-          </Container>
-      );
-  } else if (props.error !== null) {
-      return (
-          <Container className="h-100">
-              <Row className="justify-content-center h-100 align-items-center">
-                  <h4 className="text-secondary text-center align-self-center">
-                      {/* Error message can be displayed here if needed */}
-                  </h4>
-              </Row>
-          </Container>
-      );
-  }
-
-  const dropdownItems = [5, 10, 15, 20, 25].map((numEntries) => (
-      <option value={numEntries} key={numEntries}>
-          {numEntries}
-      </option>
-  ));
-
-  const entriesDropdown = (
-      <FloatingLabel label="No. of entries per page">
-          <Form.Select
-              onChange={(e) => {
-                  setPageSize(parseInt(e.target.value));
-              }}
-              defaultValue={pageSize}
-              disabled={props.data.length === 0}
-              id="numEntriesPerPage"
-          >
-              {dropdownItems}
-          </Form.Select>
-      </FloatingLabel>
-  );
-
-  const pageControls = (
-      <Pagination size={"lg"} className="justify-content-center">
-          <Pagination.First
-              disabled={pageIndex === 0}
-              onClick={() => gotoPage(0)}
-          />
-          <Pagination.Prev disabled={!canPreviousPage} onClick={previousPage} />
-          <Pagination.Next disabled={!canNextPage} onClick={nextPage} />
-          <Pagination.Last
-              disabled={pageIndex === pageCount - 1}
-              onClick={() => gotoPage(pageCount - 1)}
-          />
-      </Pagination>
-  );
-
-  const resultStats = (
-      <Col lg={4}>
-          <Alert variant={"success"}>
-              <FontAwesomeIcon icon={faCheck} /> Fetched{" "}
-              <strong>{rows.length}</strong> results in{" "}
-              <strong>{props.timeOfRequest / 1000}</strong> seconds
-          </Alert>
-      </Col>
-  );
-
-  const finalResult = props.paginate ? page : rows;
 
   return (
-      <Container fluid className="h-100">
-          <Row className="align-items-center mb-2"> {/* Added align-items-center and mb-2 */}
-              {props.timeOfRequest ? resultStats : <></>}
-              <Col lg={4}>
-                  <FloatingLabel label="Search to filter results">
-                      <Form.Control
-                          aria-label="Text input to filter results"
-                          onInput={(e) => {
-                              setGlobalFilter(e.target.value);
-                          }}
-                          id="filterInput"
-                          disabled={props.data.length === 0}
-                      />
-                  </FloatingLabel>
-              </Col>
-              <Col lg={3}>{props.paginate ? entriesDropdown : <></>}</Col>
-              <Col lg={3} className="d-flex justify-content-end"> {/* Moved buttons here */}
-                  <button onClick={exportToCSV} className="btn btn-primary me-2" disabled={!props.data || props.data.length === 0}>
-                      Export as CSV
-                  </button>
-                  <button onClick={exportToJSON} className="btn btn-secondary" disabled={!props.data || props.data.length === 0}>
-                      Export as JSON
-                  </button>
-              </Col>
-          </Row>
-          <Row
-              style={{
-                  maxHeight: "29vh",
-                  overflowY: "auto",
-                  overflowX: "auto",
-              }}
-              className="mt-3"
-          >
-              <Table
-                  {...getTableProps()}
-                  striped
-                  hover
-                  size={"sm"}
-                  className="h-100 results-table"
-                  style={{
-                      backgroundColor: "#f8f9fa",
-                      borderCollapse: "collapse",
-                      color: "#212529",
+    <InputGroup>
+      <FloatingLabel label="Search to filter results">
+        <Form.Control
+          value={searchTerm}
+          onChange={handleChange}
+          placeholder="Type to search..."
+          className="search-input"
+        />
+      </FloatingLabel>
+      {searchTerm && (
+        <Button 
+          variant="outline-secondary" 
+          onClick={clearSearch}
+          className="clear-search-btn"
+        >
+          <FontAwesomeIcon icon={faTimes} />
+        </Button>
+      )}
+      <InputGroup.Text>
+        <FontAwesomeIcon icon={faSearch} />
+      </InputGroup.Text>
+    </InputGroup>
+  );
+}
+
+function BaseTable(props) {
+  const [expandedCell, setExpandedCell] = useState(null);
+  const [expandedRow, setExpandedRow] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [modalContent, setModalContent] = useState({ title: "", content: "" });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef(null);
+  const [filterValue, setFilterValue] = useState("");
+
+  const data = useMemo(() => props.data || [], [props.data]);
+  
+  const defaultColumn = useMemo(
+    () => ({
+      // Default column properties for resizing
+      minWidth: 100,
+      width: 150,
+      maxWidth: 400,
+    }),
+    []
+  );
+  
+  const columns = useMemo(() => {
+    if (!props.columns || props.columns.length === 0) {
+      return [];
+    }
+    
+    return props.columns.map(column => ({
+      ...column,
+      Cell: ({ value, row, column }) => {
+        const cellValue = value !== undefined ? value : "";
+        const isExpandable = 
+          typeof cellValue === 'string' && 
+          (cellValue.length > 50 || cellValue.includes('\n'));
+        
+        return (
+          <div className="table-cell-content">
+            {isExpandable ? (
+              <>
+                <div className="cell-preview">
+                  {typeof cellValue === 'string' 
+                    ? cellValue.substring(0, 50) + (cellValue.length > 50 ? '...' : '') 
+                    : cellValue}
+                </div>
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  className="expand-cell-btn"
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent row expansion when clicking the button
+                    handleCellExpand(cellValue, row, column);
                   }}
-              >
-                  <thead>
-                      {headerGroups.map((headerGroup) => (
-                          <tr
-                              {...headerGroup.getHeaderGroupProps()}
-                              className="results-table-header-row"
-                          >
-                              {headerGroup.headers.map((column) => (
-                                  <th
-                                      {...column.getHeaderProps(column.getSortByToggleProps())}
-                                      className="results-table-header-cell"
-                                      style={{
-                                          minWidth: column.minWidth,
-                                          width: column.width,
-                                          position: 'relative',
-                                      }}
-                                  >
-                                      {column.render("Header")}
-                                  </th>
-                              ))}
-                          </tr>
-                      ))}
-                  </thead>
-                  <tbody {...getTableBodyProps()}>
-                      {finalResult.map((row) => {
-                          prepareRow(row);
+                  title="View full content"
+                >
+                  <FontAwesomeIcon icon={faEye} />
+                </Button>
+              </>
+            ) : (
+              cellValue
+            )}
+          </div>
+        );
+      }
+    }));
+  }, [props.columns]);
+
+  const handleCellExpand = (cellValue, row, column) => {
+    setModalContent({
+      title: `${column.Header}: ${row.values[props.columns[0].accessor]}`,
+      content: cellValue
+    });
+    setShowModal(true);
+  };
+
+  const handleRowExpand = (row, e) => {
+    // Only expand if we're not dragging
+    if (!isDragging) {
+      setExpandedRow(expandedRow === row.id ? null : row.id);
+    }
+  };
+
+  // Handle mouse events for drag detection
+  const handleMouseDown = (e) => {
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMouseMove = (e) => {
+    if (dragStartRef.current) {
+      const deltaX = Math.abs(e.clientX - dragStartRef.current.x);
+      const deltaY = Math.abs(e.clientY - dragStartRef.current.y);
+      
+      // If moved more than 5px, consider it a drag
+      if (deltaX > 5 || deltaY > 5) {
+        setIsDragging(true);
+      }
+    }
+  };
+
+  const handleMouseUp = () => {
+    dragStartRef.current = null;
+    // Reset dragging state after a short delay to allow click events to process
+    setTimeout(() => {
+      setIsDragging(false);
+    }, 100);
+  };
+
+  useEffect(() => {
+    // Add global mouse event listeners
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', handleMouseMove);
+    
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, []);
+
+  const {
+    getTableProps,
+    getTableBodyProps,
+    headerGroups,
+    prepareRow,
+    page,
+    rows,
+    canPreviousPage,
+    canNextPage,
+    pageOptions,
+    pageCount,
+    gotoPage,
+    nextPage,
+    previousPage,
+    setPageSize,
+    state,
+    setGlobalFilter,
+  } = useTable(
+    {
+      columns,
+      data,
+      defaultColumn,
+      initialState: { pageIndex: 0, pageSize: 10 },
+      autoResetPage: false,
+    },
+    useFlexLayout,
+    useResizeColumns,
+    useGlobalFilter,
+    useSortBy,
+    usePagination
+  );
+
+  const { pageIndex, pageSize } = state;
+
+  // Handle search from our custom component
+  const handleSearch = useCallback((value) => {
+    setFilterValue(value);
+    setGlobalFilter(value || undefined);
+  }, [setGlobalFilter]);
+
+  // Determine which rows to display based on pagination
+  const finalResult = props.paginate ? page : rows;
+
+  // Entries per page dropdown
+  const entriesDropdown = (
+    <Form.Group className="mb-0">
+      <Form.Select
+        value={pageSize}
+        onChange={(e) => {
+          setPageSize(Number(e.target.value));
+        }}
+        size="sm"
+      >
+        {[10, 25, 50, 100].map((size) => (
+          <option key={size} value={size}>
+            Show {size}
+          </option>
+        ))}
+      </Form.Select>
+    </Form.Group>
+  );
+
+  // Pagination controls
+  const pageControls = (
+    <Pagination size="sm">
+      <Pagination.First
+        onClick={() => gotoPage(0)}
+        disabled={!canPreviousPage}
+      />
+      <Pagination.Prev
+        onClick={() => previousPage()}
+        disabled={!canPreviousPage}
+      />
+      {pageCount > 7 ? (
+        <>
+          <Pagination.Item
+            active={pageIndex === 0}
+            onClick={() => gotoPage(0)}
+          >
+            1
+          </Pagination.Item>
+          
+          {pageIndex > 2 && <Pagination.Ellipsis />}
+          
+          {pageIndex > 0 && (
+            <Pagination.Item onClick={() => gotoPage(pageIndex - 1)}>
+              {pageIndex}
+            </Pagination.Item>
+          )}
+          
+          <Pagination.Item active>{pageIndex + 1}</Pagination.Item>
+          
+          {pageIndex < pageCount - 1 && (
+            <Pagination.Item onClick={() => gotoPage(pageIndex + 1)}>
+              {pageIndex + 2}
+            </Pagination.Item>
+          )}
+          
+          {pageIndex < pageCount - 3 && <Pagination.Ellipsis />}
+          {pageIndex < pageCount - 2 && (
+            <Pagination.Item onClick={() => gotoPage(pageCount - 1)}>
+              {pageCount}
+            </Pagination.Item>
+          )}
+        </>
+      ) : (
+        Array.from({ length: pageCount }).map((_, i) => (
+          <Pagination.Item
+            key={i}
+            active={i === pageIndex}
+            onClick={() => gotoPage(i)}
+          >
+            {i + 1}
+          </Pagination.Item>
+        ))
+      )}
+      <Pagination.Next onClick={() => nextPage()} disabled={!canNextPage} />
+      <Pagination.Last
+        onClick={() => gotoPage(pageCount - 1)}
+        disabled={!canNextPage}
+      />
+    </Pagination>
+  );
+
+  // Result stats display
+  const resultStats = (
+    <div className="mb-2">
+      <Badge bg="info" className="me-2">
+        {rows.length} results
+      </Badge>
+      {props.timeOfRequest && (
+        <Badge bg="success">
+          {(props.timeOfRequest / 1000).toFixed(2)}s
+        </Badge>
+      )}
+    </div>
+  );
+
+  return (
+    <Container fluid className="h-100">
+      <Row className="align-items-center mb-2">
+        <Col lg={5}>
+          <TableSearch onSearch={handleSearch} />
+        </Col>
+        <Col lg={3}>{props.paginate ? entriesDropdown : <></>}</Col>
+        <Col lg={4} className="d-flex justify-content-end">
+          {resultStats}
+        </Col>
+      </Row>
+      <Row
+        style={{
+          maxHeight: "29vh",
+          overflowY: "auto",
+          overflowX: "auto",
+        }}
+        className="mt-3"
+      >
+        <div className="table-responsive table-container">
+          <Table
+            {...getTableProps()}
+            bordered
+            hover
+            size={"sm"}
+            className="h-100 results-table"
+            onMouseDown={handleMouseDown}
+          >
+            <thead>
+              {headerGroups.map((headerGroup) => (
+                <tr
+                  {...headerGroup.getHeaderGroupProps()}
+                  className="results-table-header-row"
+                >
+                  {headerGroup.headers.map((column) => (
+                    <th
+                      {...column.getHeaderProps(column.getSortByToggleProps())}
+                      className="results-table-header-cell"
+                      style={{
+                        ...column.getHeaderProps().style,
+                        position: 'relative',
+                      }}
+                    >
+                      {column.render("Header")}{" "}
+                      <span>
+                        {column.isSorted ? (
+                          column.isSortedDesc ? (
+                            <FontAwesomeIcon icon={faSortDown} />
+                          ) : (
+                            <FontAwesomeIcon icon={faSortUp} />
+                          )
+                        ) : (
+                          <FontAwesomeIcon icon={faSort} className="text-muted" />
+                        )}
+                      </span>
+                      {/* Add resizer div */}
+                      <div
+                        {...column.getResizerProps()}
+                        className={`resizer ${column.isResizing ? 'isResizing' : ''}`}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
+            <tbody {...getTableBodyProps()}>
+              {finalResult.length > 0 ? (
+                finalResult.map((row) => {
+                  prepareRow(row);
+                  const isExpanded = expandedRow === row.id;
+                  
+                  return (
+                    <React.Fragment key={row.id}>
+                      <tr 
+                        {...row.getRowProps()} 
+                        className={isExpanded ? 'expanded-row' : ''}
+                        onClick={(e) => handleRowExpand(row, e)}
+                      >
+                        {row.cells.map((cell) => {
                           return (
-                              <tr
-                                  {...row.getRowProps()}
-                                  style={{
-                                      backgroundColor: "#ffffff",
-                                      color: "#212529",
-                                  }}
-                                  onMouseEnter={(e) =>
-                                      (e.currentTarget.style.backgroundColor = "#e9ecef")
-                                  }
-                                  onMouseLeave={(e) =>
-                                      (e.currentTarget.style.backgroundColor = "#ffffff")
-                                  }
-                              >
-                                  {row.cells.map((cell) => {
-                                      return (
-                                          <td
-                                              {...cell.getCellProps()}
-                                              className="results-table-cell"
-                                              style={{
-                                                  borderRight: "1px solid #dee2e6",
-                                                  padding: "0.75rem",
-                                              }}
-                                          >
-                                              {cell.render("Cell")}
-                                          </td>
-                                      );
-                                  })}
-                              </tr>
+                            <td 
+                              {...cell.getCellProps()} 
+                              className="results-table-cell"
+                            >
+                              {cell.render("Cell")}
+                            </td>
                           );
-                      })}
-                  </tbody>
-              </Table>
-          </Row>
-          <Row className="mt-2">
-              <Col>{props.paginate ? pageControls : <></>}</Col>
-          </Row>
-      </Container>
+                        })}
+                      </tr>
+                      {isExpanded && (
+                        <tr className="expanded-row-details">
+                          <td colSpan={row.cells.length}>
+                            <div className="expanded-row-content">
+                              <div className="d-flex justify-content-between align-items-center mb-3">
+                                <h6 className="m-0">Row Details</h6>
+                                <Button 
+                                  variant="outline-secondary" 
+                                  size="sm" 
+                                  onClick={() => setExpandedRow(null)}
+                                >
+                                  Close
+                                </Button>
+                              </div>
+                              <div className="row">
+                                {Object.entries(row.original).map(([key, value]) => (
+                                  <div className="col-md-6 mb-2" key={key}>
+                                    <div className="detail-item">
+                                      <strong>{key}:</strong> 
+                                      <span className="detail-value">
+                                        {typeof value === 'string' && value.length > 100 
+                                          ? value.substring(0, 100) + '...' 
+                                          : String(value)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={columns.length} className="text-center py-3">
+                    {filterValue ? (
+                      <>
+                        No matching records found for <strong>"{filterValue}"</strong>
+                      </>
+                    ) : (
+                      "No data available"
+                    )}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </Table>
+        </div>
+      </Row>
+      <Row className="mt-2">
+        <Col>{props.paginate ? pageControls : <></>}</Col>
+      </Row>
+
+      {/* Modal for expanded cell content */}
+      <Modal show={showModal} onHide={() => setShowModal(false)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>{modalContent.title}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <pre className="expanded-content">{modalContent.content}</pre>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    </Container>
   );
 }
 

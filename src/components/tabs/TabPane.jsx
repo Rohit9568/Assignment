@@ -1,9 +1,13 @@
 // src/components/tabs/TabPane.jsx
-import { Fragment, useState, useRef, Children, Suspense, lazy, cloneElement, useEffect } from 'react'; // Import useEffect
+import { Fragment, useState, useRef, Children, Suspense, lazy, cloneElement, useEffect } from 'react';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Container from 'react-bootstrap/Container';
 import Nav from 'react-bootstrap/Nav';
+import Button from 'react-bootstrap/Button';
+import ButtonGroup from 'react-bootstrap/ButtonGroup';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faDownload } from '@fortawesome/free-solid-svg-icons';
 import QueryButtons from '../query/queryButtons';
 import QuerySpace from '../query/querySpace';
 import ResultsTable from '../table/resultsTable';
@@ -20,12 +24,60 @@ function CustomTabItem({ eventKey, title, active, onClick, children }) {
 }
 
 // Custom tabs container component
-function CustomTabs({ defaultActiveKey, children, onSelect }) {
+function CustomTabs({ defaultActiveKey, children, onSelect, result, isLoaded }) {
     const [activeKey, setActiveKey] = useState(defaultActiveKey);
 
     const handleSelect = (key) => {
         setActiveKey(key);
         if (onSelect) onSelect(key);
+    };
+
+    // Export functions
+    const exportToCSV = () => {
+        if (!result || result.length === 0) {
+            alert("No data to export.");
+            return;
+        }
+
+        const headers = Object.keys(result[0]);
+        const csvRows = result.map(row => 
+            headers.map(header => {
+                let value = row[header];
+                if (value === null || value === undefined) {
+                    value = '';
+                } else if (typeof value === 'string') {
+                    value = `"${value.replace(/"/g, '""')}"`; // Escape double quotes
+                }
+                return value;
+            }).join(',')
+        );
+
+        const csvData = [headers.join(','), ...csvRows].join('\n');
+        const filename = 'exported_data.csv';
+        downloadFile(csvData, filename, 'text/csv;charset=utf-8;');
+    };
+
+    const exportToJSON = () => {
+        if (!result || result.length === 0) {
+            alert("No data to export.");
+            return;
+        }
+
+        const jsonData = JSON.stringify(result, null, 2); // null, 2 for pretty printing
+        const filename = 'exported_data.json';
+        downloadFile(jsonData, filename, 'application/json');
+    };
+
+    const downloadFile = (data, filename, type) => {
+        const blob = new Blob([data], { type });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
     // Extract tab titles for the nav
@@ -45,192 +97,171 @@ function CustomTabs({ defaultActiveKey, children, onSelect }) {
         );
     });
 
-    // Render content of active tab
-    const tabContents = Children.map(children, (child) => {
-        if (!child) return null;
-
-        const { eventKey } = child.props;
-        return cloneElement(child, {
-            active: activeKey === eventKey
-        });
-    });
-
     return (
         <div className="custom-tabs">
-            <Nav variant="tabs" className="mb-3">
-                {tabTitles}
-            </Nav>
-            <div className="tab-content">
-                {tabContents}
+            <div className="d-flex justify-content-between align-items-center mb-2">
+                <Nav variant="tabs">
+                    {tabTitles}
+                </Nav>
+                <ButtonGroup>
+                    <Button 
+                        size="sm" 
+                        variant="outline-primary" 
+                        onClick={exportToCSV}
+                        disabled={!isLoaded || !result || result.length === 0}
+                    >
+                        <FontAwesomeIcon icon={faDownload} /> Export as CSV
+                    </Button>
+                    <Button 
+                        size="sm" 
+                        variant="outline-primary" 
+                        onClick={exportToJSON}
+                        disabled={!isLoaded || !result || result.length === 0}
+                    >
+                        <FontAwesomeIcon icon={faDownload} /> Export as JSON
+                    </Button>
+                </ButtonGroup>
             </div>
+            {children}
         </div>
     );
 }
 
 // Main TabPane component
 const TabPane = ({ tab }) => {
-    const { result: fileResult, isLoaded: fileIsLoaded, error, timeOfRequest: fileTimeOfRequest } = useFile(tab.title);
-    const [query, setQuery] = useState(tab.content || ''); // Initialize query with tab.content
-    const [results, setResults] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [executionTime, setExecutionTime] = useState(null); // Initialize as null
-    const queryRef = useRef(null);
-    const hasInitialRun = useRef(false); // To track if the initial query from sidebar click has run
+    const [activeTabKey, setActiveTabKey] = useState('results');
+    const [tableData, setTableData] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [executionTime, setExecutionTime] = useState(0);
 
-    const handleQueryChange = (newQuery) => {
-        setQuery(newQuery);
-    };
+    useEffect(() => {
+        const loadTableData = async () => {
+            setIsLoading(true);
+            const startTime = Date.now();
 
-    const handleRunQuery = () => {
-        setLoading(true);
-        setExecutionTime(null); // Reset execution time
-
-        // Track query execution time
-        const startTime = Date.now();
-
-        // Simulate query execution
-        setTimeout(() => {
-            let mockResults = [];
-            const queryLower = query.toLowerCase();
-
-            if (queryLower.includes('employee')) {
-                mockResults = [
-                    { employee_id: 1, first_name: "John", last_name: "Doe", title: "Sales Manager", hire_date: "2020-01-15", salary: 75000 },
-                    { employee_id: 2, first_name: "Jane", last_name: "Smith", title: "HR Specialist", hire_date: "2019-06-22", salary: 65000 },
-                    { employee_id: 3, first_name: "Bob", last_name: "Johnson", title: "Finance Director", hire_date: "2018-03-10", salary: 82000 },
-                    { employee_id: 4, first_name: "Alice", last_name: "Williams", title: "Software Engineer", hire_date: "2021-02-08", salary: 78000 },
-                    { employee_id: 5, first_name: "Charlie", last_name: "Brown", title: "Marketing Specialist", hire_date: "2019-11-30", salary: 63000 }
-                ];
-            } else if (queryLower.includes('customer')) {
-                mockResults = [
-                    { customer_id: "ALFKI", company_name: "Alfreds Futterkiste", contact_name: "Maria Anders", country: "Germany" },
-                    { customer_id: "ANATR", company_name: "Ana Trujillo Emparedados", contact_name: "Ana Trujillo", country: "Mexico" },
-                    { customer_id: "ANTON", company_name: "Antonio Moreno Taquería", contact_name: "Antonio Moreno", country: "Mexico" },
-                    { customer_id: "AROUT", company_name: "Around the Horn", contact_name: "Thomas Hardy", country: "UK" },
-                    { customer_id: "BERGS", company_name: "Berglunds snabbköp", contact_name: "Christina Berglund", country: "Sweden" }
-                ];
-            } else if (queryLower.includes('order')) {
-                mockResults = [
-                    { order_id: 10248, customer_id: "VINET", employee_id: 5, order_date: "1996-07-04" },
-                    { order_id: 10249, customer_id: "TOMSP", employee_id: 6, order_date: "1996-07-05" },
-                    { order_id: 10250, customer_id: "HANAR", employee_id: 4, order_date: "1996-07-08" },
-                    { order_id: 10251, customer_id: "VICTE", employee_id: 3, order_date: "1996-07-09" },
-                    { order_id: 10252, customer_id: "SUPRD", employee_id: 4, order_date: "1996-07-10" }
-                ];
-            } else if (queryLower.includes('product')) {
-                mockResults = [
-                    { product_id: 1, product_name: "Chai", category_id: 1, unit_price: 18.00 },
-                    { product_id: 2, product_name: "Chang", category_id: 1, unit_price: 19.00 },
-                    { product_id: 3, product_name: "Aniseed Syrup", category_id: 2, unit_price: 10.00 },
-                    { product_id: 4, product_name: "Chef Anton's Cajun Seasoning", category_id: 2, unit_price: 22.00 },
-                    { product_id: 5, product_name: "Gumbo Mix", category_id: 2, unit_price: 21.35 }
-                ];
-            } else {
-                // Default mock data if table can't be determined
-                mockResults = [
-                    { id: 1, name: "Sample Record 1", value: "Data 1", amount: 100 },
-                    { id: 2, name: "Sample Record 2", value: "Data 2", amount: 200 },
-                    { id: 3, name: "Sample Record 3", value: "Data 3", amount: 300 },
-                    { id: 4, name: "Sample Record 4", value: "Data 4", amount: 400 },
-                    { id: 5, name: "Sample Record 5", value: "Data 5", amount: 500 }
-                ];
+            try {
+                // Determine which table to load based on tab.title
+                const tableName = tab.title.toLowerCase();
+                const response = await fetch(`/data/${tableName}.csv`);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load ${tableName} data`);
+                }
+                
+                const csvText = await response.text();
+                const data = parseCSV(csvText);
+                
+                setTableData(data);
+                setError(null);
+                const endTime = Date.now();
+                setExecutionTime(endTime - startTime);
+            } catch (err) {
+                console.error("Error loading table data:", err);
+                setError(err.message);
+                setTableData([]);
+            } finally {
+                setIsLoading(false);
             }
+        };
+        
+        loadTableData();
+    }, [tab.title]);
 
-            const endTime = Date.now();
-            setExecutionTime(endTime - startTime);
-            setResults(mockResults);
-            setLoading(false);
-        }, 800);
-    };
-
-    useEffect(() => {
-        console.log("TabPane received tab.content:", tab.content); // ADD THIS LINE
-        if (tab.content && !hasInitialRun.current) {
-            // No need to set query again here, it's initialized directly
-            handleRunQuery(); // Immediately trigger the data fetch
-            hasInitialRun.current = true;
+    // Function to parse CSV data
+    const parseCSV = (csvText) => {
+        const lines = csvText.split('\n');
+        const headers = lines[0].split(',').map(header => header.trim());
+        
+        const result = [];
+        for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue; // Skip empty lines
+            
+            const values = parseCSVLine(lines[i]);
+            const obj = {};
+            
+            headers.forEach((header, index) => {
+                obj[header] = values[index] || '';
+            });
+            
+            result.push(obj);
         }
-    }, [tab.content]);
-
-    useEffect(() => {
-        console.log("TabPane query state:", query); // ADD THIS LINE
-    }, [query]);
+        
+        return result;
+    };
+    
+    // Helper function to handle quoted values in CSV
+    const parseCSVLine = (line) => {
+        const result = [];
+        let inQuotes = false;
+        let currentValue = '';
+        
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                result.push(currentValue);
+                currentValue = '';
+            } else {
+                currentValue += char;
+            }
+        }
+        
+        result.push(currentValue); // Add the last value
+        return result;
+    };
 
     return (
         <Fragment>
             <Container fluid className="tab-container">
+                {/* Query Section */}
+                <Row className="mb-3">
+                    <Col xs={12}>
+                        <QueryButtons />
+                    </Col>
+                </Row>
+                
+                <Row className="mb-4">
+                    <Col xs={12} style={{ height: "200px" }}>
+                        <QuerySpace 
+                            defaultQuery={tab.defaultQuery || `SELECT * FROM ${tab.title}`} 
+                            style={{ height: "100%" }}
+                        />
+                    </Col>
+                </Row>
+                
+                <hr className="my-4" />
+                
+                {/* Results Section */}
                 <Row>
                     <Col xs={12}>
-                        <Container fluid className="query-container">
-                            <Row className="query-editor-row">
-                                <Col xs={12}>
-                                    <Suspense fallback={<div>Loading query editor...</div>}>
-                                        <QuerySpace
-                                            defaultQuery={query} // Ensure the 'query' state is passed here
-                                            onChange={handleQueryChange}
-                                        />
-                                    </Suspense>
-                                </Col>
-                            </Row>
-                            <Row className="query-buttons-row">
-                                <Col xs={12}>
-                                    <Suspense fallback={<div>Loading query buttons...</div>}>
-                                        <QueryButtons onRunQuery={handleRunQuery} isLoading={loading} />
-                                    </Suspense>
-                                </Col>
-                            </Row>
-                            <Row className="results-row">
-                                <Col xs={12}>
-                                    <Suspense fallback={<div className="text-center py-3">Loading results...</div>}>
-                                        <ResultsTable
-                                            data={results}
-                                            loading={loading}
-                                            tab={tab}
-                                            isLoaded={!loading} // isLoaded is true only when not loading
-                                            timeOfRequest={executionTime}
-                                        />
-                                    </Suspense>
-                                </Col>
-                            </Row>
-                            {/* REMOVE THIS ENTIRE BLOCK */}
-                            {/* {executionTime !== null && (
-                                <Row className="mt-2">
-                                    <Col>
-                                        <p className="text-muted small">
-                                            Time Taken: {executionTime}ms, Results: {results.length}
-                                        </p>
-                                    </Col>
-                                </Row>
-                            )} */}
-                        </Container>
+                        <CustomTabs 
+                            defaultActiveKey="results" 
+                            onSelect={setActiveTabKey}
+                            result={tableData}
+                            isLoaded={!isLoading}
+                        >
+                            <CustomTabItem eventKey="results" title="Results" active={activeTabKey === 'results'}>
+                                <ResultsTable
+                                    data={tableData}
+                                    isLoaded={!isLoading}
+                                    error={error}
+                                    timeOfRequest={executionTime}
+                                />
+                            </CustomTabItem>
+                            <CustomTabItem eventKey="columns" title="Columns" active={activeTabKey === 'columns'}>
+                                <ColumnsTable
+                                    result={tableData}
+                                    isLoaded={!isLoading}
+                                    error={error}
+                                />
+                            </CustomTabItem>
+                        </CustomTabs>
                     </Col>
                 </Row>
             </Container>
-            <hr />
-            <CustomTabs defaultActiveKey="results">
-                <CustomTabItem eventKey="results" title="Results">
-                    {loading ? (
-                        <div className="text-center py-3">Loading results...</div>
-                    ) : (
-                        <ResultsTable
-                            result={fileResult}
-                            isLoaded={!loading && fileIsLoaded} // Conditional isLoaded
-                            error={error}
-                            tab={tab}
-                            timeOfRequest={executionTime || fileTimeOfRequest}
-                            data={results || []}
-                        />
-                    )}
-                </CustomTabItem>
-                <CustomTabItem eventKey="columns" title="Columns">
-                    <ColumnsTable
-                        result={fileResult}
-                        isLoaded={fileIsLoaded || false}
-                        error={error}
-                        tab={tab}
-                    />
-                </CustomTabItem>
-            </CustomTabs>
         </Fragment>
     );
 };
