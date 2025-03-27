@@ -78,37 +78,8 @@ function QueryButtons({ onRunQuery, isLoading = false }) {
           <FontAwesomeIcon icon={faSave} /> Save Query
         </Button>
 
-        <Button
-          size={"sm"}
-          variant={"outline-primary"}
-          style={{
-            borderLeft: "none",
-            borderTop: "none",
-            borderBottom: "none",
-            borderRadius: 0,
-            padding: "0.5rem",
-          }}
-          className={"mr-2 query-button"}
-          disabled={isLoading}
-        >
-          <FontAwesomeIcon icon={faDownload} /> Export as CSV
-        </Button>
-
-        <Button
-          size={"sm"}
-          variant={"outline-primary"}
-          style={{
-            borderLeft: "none",
-            borderTop: "none",
-            borderBottom: "none",
-            borderRadius: 0,
-            padding: "0.5rem",
-          }}
-          className={"mr-2 query-button"}
-          disabled={isLoading}
-        >
-          <FontAwesomeIcon icon={faDownload} /> Export as JSON
-        </Button>
+      
+       
       </ButtonGroup>
     </ButtonToolbar>
   );

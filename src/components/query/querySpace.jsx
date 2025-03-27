@@ -1,21 +1,14 @@
-import { useState, useCallback, useEffect } from 'react'; // Import useEffect
+import { useState, useCallback, useEffect, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { sql } from '@codemirror/lang-sql';
 import { Button, ButtonGroup } from 'react-bootstrap';
 import { getPropTypes } from "../../utils";
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExpandAlt, faCompressAlt } from '@fortawesome/free-solid-svg-icons';
-
-// Sample queries for users to try
-const SAMPLE_QUERIES = [
-    'SELECT * FROM customers',
-    'SELECT product_name, price FROM products WHERE category = "electronics"',
-    'SELECT orders.order_id, customers.name FROM orders JOIN customers ON orders.customer_id = customers.id'
-];
+import { autocompletion, CompletionContext } from '@codemirror/autocomplete';
 
 const QuerySpace = ({ defaultQuery = 'SELECT * FROM employees', onChange, isQuerySpaceFullscreen }) => {
     const [value, setValue] = useState(defaultQuery);
     const [isDarkTheme, setIsDarkTheme] = useState(false);
+    const cmRef = useRef();
 
     const handleChange = useCallback((value) => {
         setValue(value);
@@ -26,7 +19,49 @@ const QuerySpace = ({ defaultQuery = 'SELECT * FROM employees', onChange, isQuer
         setIsDarkTheme(!isDarkTheme);
     }, [isDarkTheme]);
 
-    // Update the 'value' state when the 'defaultQuery' prop changes
+    // ✅ List of SQL keywords for autocomplete (uppercase)
+    const sqlKeywords = [
+        "SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "JOIN", "INNER JOIN",
+        "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "GROUP BY", "ORDER BY", "HAVING", "DISTINCT",
+        "IN", "NOT IN", "EXISTS", "LIKE", "IS NULL", "IS NOT NULL", "BETWEEN", "UNION", 
+        "CASE", "WHEN", "THEN", "ELSE", "END", "LIMIT", "OFFSET", "AS"
+    ];
+
+    const uppercaseCompletionSource = (context) => {
+        const word = context.matchBefore(/\w*$/);
+        if (!word) return null;
+
+        const completions = sqlKeywords.map(keyword => ({
+            label: keyword,
+            type: "keyword",
+            apply: (view, completion) => {
+                // ✅ Calculate start of the current word and replace it with the suggestion
+                const from = word.from;
+                const to = context.state.selection.main.head;
+                const insertText = completion.label.toUpperCase();
+
+                view.dispatch({
+                    changes: [{ from, to, insert: insertText }],
+                    selection: { anchor: from + insertText.length }
+                });
+            }
+        }));
+
+        return {
+            from: word.from,
+            options: completions,
+            validFor: /^\w*$/,
+        };
+    };
+
+    const customAutocomplete = () => [
+        sql(),
+        autocompletion({
+            override: [uppercaseCompletionSource],
+            activateOnTyping: true,
+        }),
+    ];
+
     useEffect(() => {
         setValue(defaultQuery);
     }, [defaultQuery]);
@@ -49,10 +84,11 @@ const QuerySpace = ({ defaultQuery = 'SELECT * FROM employees', onChange, isQuer
             </div>
             <div className={`code-editor-container ${isDarkTheme ? 'theme-dark' : 'theme-light'}`}>
                 <CodeMirror
+                    ref={cmRef}
                     value={value}
-                    height={isQuerySpaceFullscreen ? 'calc(100vh - 56px)' : '200px'} // Adjust height calculation
+                    height={isQuerySpaceFullscreen ? 'calc(100vh - 56px)' : '200px'}
                     theme={isDarkTheme ? 'dark' : 'light'}
-                    extensions={[sql()]}
+                    extensions={customAutocomplete()}
                     onChange={handleChange}
                     className="code-editor"
                     style={{
